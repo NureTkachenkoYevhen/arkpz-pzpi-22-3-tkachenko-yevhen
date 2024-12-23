@@ -1,0 +1,221 @@
+﻿МІНІСТЕРСТВО ОСВІТИ І НАУКИ УКРАЇНИ
+ХАРКІВСЬКИЙ НАЦІОНАЛЬНИЙ УНІВЕРСИТЕТ РАДІОЕЛЕКТРОНІКИ
+
+
+
+
+Звіт
+з лабораторної роботи №3
+ з дисципліни «Аналіз та рефакторинг коду»
+на тему: «РОЗРОБКА БІЗНЕС-ЛОГІКИ ТА ФУНКЦІЙ АДМІНІСТРУВАННЯ СЕРВЕРНОЇ ЧАСТИНИ ПРОГРАМНОЇ СИСТЕМИ»
+
+
+
+
+Виконав:
+ студент групи ПЗПІ-22-3
+Ткаченко Євген Андрійович
+
+
+Перевірив:
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+Харків 2024
+1 МЕТА РОБОТИ
+
+Розробити бізнес-логику та функції адміністрування серверної частини  програмної системи.
+
+2 ХІД РОБОТИ
+
+Під час виконання лабораторної роботи було реалізовано бізнес логіку:
+•	Реєстрація та авторизація користувачів.
+•	Хешування паролів.
+•	Обробка значеннь датчиків про підтягування.
+•	Вирахування правильності підтягувань.
+•	Створення рекомендацій на основі тренувань задля покращення наступних сесій.
+Відео з поясненнями наведено в додатку А. Під час виконання лабораторної роботи було сформовано UML діаграми діяльності (додаток Б). Також було сформовано UML діаграму взаємодії (послідовності) для створення нового користувача та його входу в систему, ця діаграма наведена в додатку В. 
+
+ВИСНОВКИ
+
+Під час  виконання лабораторної роботи було розроблено бізнес-логіку та функції адміністрування серверної частини програмної системи для моніторингу та оцінки техніки виконання фізичних вправ. Також було створено UML діаграми діяльності та взаємодії (послідовності).
+
+
+
+
+ДОДАТОК А
+Посилання на відео
+
+https://youtu.be/DX1SiwPdlhw
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ДОДАТОК Б
+UML діаграма діяльності
+
+ 
+Рисунок Б.1 - UML діаграма діяльності
+ДОДАТОК В
+UML діаграма взаємодії
+
+ 
+Рисунок Б.1 - UML діаграма взаємодії
+
+
+
+
+
+
+
+
+
+
+ДОДАТОК Г
+Клас для підрахунку правильності підтягувань
+
+1. package com.tkachenko.yevhen.workout.service.impl;
+2. 
+3. public class CorrectnessScoreCalculator {
+4. 
+5.     private static final float MAX_TILT_ANGLE = 15.0f;
+6.     private static final float OPTIMAL_REP_TIME = 2.5f;
+7.     private static final float HEIGHT_WEIGHT = 0.4f;
+8.     private static final float TILT_ANGLE_WEIGHT = 0.3f;
+9.     private static final float TIME_WEIGHT = 0.3f;
+10. 
+11.     public static float calculateCorrectnessScore(float actualHeight, float tiltAngle, int repNumber, float repTime, float userHeight) {
+12. 
+13.         float armLength = 0.4f * userHeight;
+14. 
+15.         float heightScore = calculateHeightScore(actualHeight, armLength);
+16. 
+17.         float tiltAngleScore = calculateTiltAngleScore(tiltAngle);
+18. 
+19.         float timeScore = calculateTimeScore(repTime);
+20. 
+21.         float correctnessScore = (HEIGHT_WEIGHT * heightScore)
+22.                 + (TILT_ANGLE_WEIGHT * tiltAngleScore)
+23.                 + (TIME_WEIGHT * timeScore);
+24. 
+25.         return Math.round(correctnessScore * 100) / 100.0f;
+26.     }
+27. 
+28.     private static float calculateHeightScore(float actualHeight, float optimalHeight) {
+29.         float difference = Math.abs(actualHeight - optimalHeight);
+30.         return Math.max(0.0f, 1.0f - (difference / optimalHeight));
+31.     }
+32. 
+33.     private static float calculateTiltAngleScore(float tiltAngle) {
+34.         if (tiltAngle <= MAX_TILT_ANGLE) {
+35.             return 1.0f;
+36.         } else {
+37.             float penalty = (tiltAngle - MAX_TILT_ANGLE) / MAX_TILT_ANGLE;
+38.             return Math.max(0.0f, 1.0f - penalty);
+39.         }
+40.     }
+41. 
+42.     private static float calculateTimeScore(float repTime) {
+43.         float deviation = Math.abs(repTime - OPTIMAL_REP_TIME);
+44.         float maxDeviation = OPTIMAL_REP_TIME * 0.5f;
+45.         if (deviation <= maxDeviation) {
+46.             return 1.0f;
+47.         } else {
+48.             float penalty = deviation / maxDeviation;
+49.             return Math.max(0.0f, 1.0f - penalty);
+50.         }
+51.     }
+52. }
+
+
+
+
+
+
+
+
+
+
+
+
+
+ДОДАТОК В
+Метод для створення рекомендацій
+
+1. private static String generateSessionRecommendation(List<Metric> sessionMetrics, float userHeight) {
+2.         float optimalHeight = 0.4f * userHeight;
+3.         float maxTiltAngle = 15.0f;
+4.         float optimalRepTime = 2.5f;
+5.         sessionMetrics.sort(Comparator.comparing(Metric::getTimestamp));
+6. 
+7.         List<Float> repTimes = new ArrayList<>();
+8.         for (int i = 1; i < sessionMetrics.size(); i++) {
+9.             Metric previousMetric = sessionMetrics.get(i - 1);
+10.             Metric currentMetric = sessionMetrics.get(i);
+11.             float repTime = (float) java.time.Duration.between(previousMetric.getTimestamp(), currentMetric.getTimestamp()).toMillis() / 1000;
+12.             repTimes.add(repTime);
+13.         }
+14. 
+15.         if (!sessionMetrics.isEmpty() && sessionMetrics.getFirst().getRepNumber() == 0) {
+16.             repTimes.add(optimalRepTime);
+17.         }
+18. 
+19.         float averageHeight = (float) sessionMetrics.stream().mapToDouble(Metric::getHeight).average().orElse(0.0);
+20.         float averageTiltAngle = (float) sessionMetrics.stream().mapToDouble(Metric::getTiltAngle).average().orElse(0.0);
+21.         float averageRepTime = (float) repTimes.stream().mapToDouble(Float::doubleValue).average().orElse(0.0);
+22.         float averageCorrectnessScore = (float) sessionMetrics.stream().mapToDouble(Metric::getCorrectnessScore).average().orElse(0.0);
+23. 
+24.         StringBuilder recommendation = new StringBuilder();
+25. 
+26.         if (averageHeight < optimalHeight * 0.9) {
+27.             recommendation.append("Середня висота підтягувань недостатня. Постарайтеся піднімати підборіддя вище турніка. ");
+28.         } else if (averageHeight > optimalHeight * 1.1) {
+29.             recommendation.append("Середня висота підтягувань занадто висока, що може спричинити перенапруження. Виконуйте рух плавно. ");
+30.         }
+31. 
+32.         if (averageTiltAngle > maxTiltAngle * 0.8) {
+33.             recommendation.append("Середній кут нахилу тулуба занадто великий. Слідкуйте за рівним положенням спини під час підтягувань. ");
+34.         }
+35. 
+36.         if (averageRepTime < optimalRepTime * 0.5) {
+37.             recommendation.append("Середній час між повтореннями занадто короткий. Збільшіть час між повтореннями для кращого контролю. ");
+38.         } else if (averageRepTime > optimalRepTime * 1.5) {
+39.             recommendation.append("Середній час між повтореннями занадто довгий. Намагайтеся виконувати підтягування ритмічно. ");
+40.         }
+41. 
+42.         if (averageCorrectnessScore < 0.7) {
+43.             recommendation.append("Загальна техніка виконання потребує покращення. Перегляньте основні моменти руху, щоб уникнути помилок. ");
+44.         }
+45. 
+46.         if (recommendation.isEmpty()) {
+47.             recommendation.append("Техніка виконання виглядає добре. Продовжуйте в тому ж дусі!");
+48.         } else {
+49.             recommendation.append("Працюйте над технікою, щоб досягти кращих результатів!");
+50.         }
+51. 
+52.         return recommendation.toString();
+53.     }

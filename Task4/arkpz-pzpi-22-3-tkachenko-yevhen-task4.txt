@@ -1,0 +1,199 @@
+﻿МІНІСТЕРСТВО ОСВІТИ І НАУКИ УКРАЇНИ
+ХАРКІВСЬКИЙ НАЦІОНАЛЬНИЙ УНІВЕРСИТЕТ РАДІОЕЛЕКТРОНІКИ
+
+
+
+
+Звіт
+з лабораторної роботи №4
+ з дисципліни «Аналіз та рефакторинг коду»
+на тему: «РОЗРОБКА IoT КЛІЄНТА 
+(БІЗНЕС-ЛОГІКИ ТА ФУНКЦІЙ НАЛАШТУВАННЯ)»
+
+
+
+
+Виконав:
+ студент групи ПЗПІ-22-3
+Ткаченко Євген Андрійович
+
+
+Перевірив:
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+Харків 2024
+1 МЕТА РОБОТИ
+
+Розробити програмне забезпечення для  IoT або SmartDevice пристрою, створеного на базі будь-якої поширеної на  сьогодні платформи, придатної для реалізації вбудованих систем (Embedded  System). 
+Пристрій повинен бути частиною програмної системи і повинен взаємодіяти з нею. Програмне забезпечення повинно реалізовувати розширену функціональність, що відповідає концепції IoT або SmartDevice, та забезпечувати взаємодію з  іншими частинами системи. 
+
+2 ХІД РОБОТИ
+
+У ході виконання лабораторної роботи було розроблено діаграму прецедентів та діаграми діяльності для IoT-клієнтів. Діаграма прецедентів дозволила визначити основні сценарії роботи системи. Діаграма діяльності дала розуміння послідовності виконняння системи, налаштування та використання IoT-клієнта та обробки даних.
+- Реалізовано  функцію для з’єдняння з меречею через WiFi. При невдачі систама повторно намагається провести з’єднання.
+	- Реалізовано функцію для генерації даних, для імітації роботи сенсорів, після цього система, попередньо обробляє їх перед відправкою на сервер. Алгоритм попередньої обробки включає розрахунок кута нахилу, також використовуючи при цьому відстань.
+	-  Реалізовано функції для відправлення даних у форматі JSON через HTTP POST-запити. 
+	- Оброблено помилки при передачі даних через запити.
+Відео з поясненнями наведено в додатку А. Під час виконання лабораторної роботи було сформовано UML діаграми прецедентів (додаток Б). Також було сформовано UML діаграми діяльності, ця діаграма наведена в додатку В. Частини коду наведено у додатку В.
+ВИСНОВКИ
+
+Під час виконання лабораторної роботи було розроблено бізнес-логіку та функції налаштування Iot-клієнта для програмної системи для моніторингу та оцінки техніки виконання фізичних вправ.
+Було розроблено функції для автоматичного підключення до Wi-Fi мережі, автоматичної генеріції випадковик показників сенсорів, та відправка на сервер для подальшого аналізу.
+Створено тунель для  відправки запиту на локальний сервер через хмарну систему Wokwi.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ДОДАТОК А
+Посилання на відео
+
+https://youtu.be/3JElwyH5LPY
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ДОДАТОК Б
+UML Діаграма прецедентів ІоТ клієнта
+
+ 
+
+Рисунок Б.1 – UML діаграма прецедентів ІоТ клієнта
+
+
+
+
+ДОДАТОК В
+UML Діаграма діяльності ІоТ клієнта
+
+ 
+
+Рисунок В.1 – UML діаграма діяльності ІоТ клієнта
+
+
+
+
+
+
+
+ДОДАТОК Г
+Код для читання даних з датчиків та відправки їх на сервер
+
+1. #include "workout.h"
+2. #include <ArduinoJson.h>
+3. #include <math.h>
+4. #include <base64.h>
+5. 
+6. const String SERVER_URL = "https://rnrki-31-202-35-207.a.free.pinggy.link/api/metrics";
+7. 
+8. void generateAccelerometerData(float &ax, float &ay, float &az) {
+9.   ax = random(-1000, 1000) / 1000.0;
+10.   ay = random(-1000, 1000) / 1000.0; 
+11.   az = random(900, 1100) / 1000.0; 
+12. }
+13. 
+14. void generateUltrasonicData(float &distance) {
+15.   distance = random(200, 900) / 10.0;
+16. }
+17. 
+18. void processSensorData(float ax, float ay, float az, float distance, float &height, float &tiltAngle) {
+19.   height = distance;
+20. 
+21.   float magnitude = sqrt(ax * ax + ay * ay + az * az);
+22.   float tiltRadians = acos(az / magnitude);
+23.   tiltAngle = tiltRadians * (180.0 / M_PI);
+24. }
+25. 
+26. void sendPullUpData(float height, float tiltAngle) {
+27.   HTTPClient http;
+28.   StaticJsonDocument<200> jsonDoc;
+29. 
+30.   jsonDoc["sessionId"] = 1;
+31.   jsonDoc["height"] = height;
+32.   jsonDoc["tiltAngle"] = tiltAngle;
+33. 
+34.   String jsonData;
+35.   serializeJson(jsonDoc, jsonData);
+36. 
+37.   http.begin(SERVER_URL);
+38.   http.addHeader("Content-Type", "application/json");
+39. 
+40.   String username = "admin";
+41.   String password = "admin";
+42.   String authHeader = "Basic " + base64::encode(username + ":" + password);
+43.   http.addHeader("Authorization", authHeader);
+44. 
+45.   Serial.println(jsonData);
+46. 
+47.   int httpResponseCode = http.POST(jsonData);
+48. 
+49.   if (httpResponseCode > 0) {
+50.     Serial.print("Data sent successfully. Server response code: ");
+51.     Serial.println(httpResponseCode);
+52.   } else {
+53.     Serial.print("Error sending data. Error code: ");
+54.         Serial.print("Failed to send data. Error code: ");
+55.         Serial.print(httpResponseCode);
+56.         Serial.print(" - ");
+57.         Serial.println(http.errorToString(httpResponseCode).c_str());
+58.   }
+59. 
+60.   http.end();
+61. }
+62. 
+63. void simulatePullUps() {
+64.   float ax, ay, az;
+65.   float distance;
+66.   float height, tiltAngle;
+67. 
+68.   generateAccelerometerData(ax, ay, az);
+69.   generateUltrasonicData(distance);
+70. 
+71.   processSensorData(ax, ay, az, distance, height, tiltAngle);
+72. 
+73.   sendPullUpData(height, tiltAngle);
+74. 
+75.   int delayTime = random(1000, 5000);
+76.   delay(delayTime);
+77. }
